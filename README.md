@@ -34,3 +34,27 @@ DELETE /device/{room_id}/{device_id}
 
 
 ```
+
+##
+## On database
+RoomTable
+|room_id| room_name|
+|---|---|
+|0|kitchen|
+|1|bathroom|
+
+DeviceTable
+|device_id (unique) |room_id|device_id(unique)|address (unique) |device_type|
+|---|---|---|---|---|
+|0|0|socket_1|127.0.0.1:8000|TcpSocket|
+|1|0|socket_2|127.0.0.1:9000|TcpSocket|
+|2|1|thermo_1|127.0.0.1:8080|UdpThermo|
+
+```rust
+DeviceQuery {
+    device_type: DeviceType,
+    address: SocketAddr,
+    query: String
+}
+fn query(devise_repository, query: DeviceQuery) -> DeviceResponse;
+```
