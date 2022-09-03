@@ -1,4 +1,4 @@
-use crate::domain::entity::{RoomInfo, DeviceInfo, RoomName, DeviceName};
+use crate::domain::entity::{DeviceInfo, DeviceName, RoomInfo, RoomName};
 use std::sync::Mutex;
 
 pub enum InsertError {
@@ -29,7 +29,11 @@ pub trait Repository: Send + Sync {
 
     // fn fetch_rooms(&self) -> Result<Vec<Room>, FetchAllError>;
 
-    fn add_device(&self, room: RoomName, device: DeviceName) -> Result<DeviceInfo, InsertError>;
+    fn add_device(
+        &self,
+        room_name: RoomName,
+        device_info: DeviceInfo,
+    ) -> Result<DeviceInfo, InsertError>;
 
     // fn delete_device(&mut self) -> Result<(), DeleteError>;
 
@@ -40,14 +44,14 @@ pub trait Repository: Send + Sync {
 
 pub struct ImMemoryRepository {
     returns_error: bool,
-    rooms: Mutex<Vec<RoomInfo>>
+    rooms: Mutex<Vec<RoomInfo>>,
 }
 
 impl ImMemoryRepository {
     pub fn new() -> Self {
         Self {
             returns_error: false,
-            rooms: Mutex::new(Vec::new())
+            rooms: Mutex::new(Vec::new()),
         }
     }
 
@@ -68,7 +72,7 @@ impl Repository for ImMemoryRepository {
 
         let mut rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(InsertError::Unknown)
+            _ => return Err(InsertError::Unknown),
         };
 
         if rooms.iter().any(|room| room.name == name) {
@@ -77,10 +81,10 @@ impl Repository for ImMemoryRepository {
 
         let new_room = RoomInfo {
             name: name,
-            devices: Vec::new()
+            devices: Vec::new(),
         };
         rooms.push(new_room.clone());
-        
+
         Ok(new_room)
     }
 
@@ -91,22 +95,46 @@ impl Repository for ImMemoryRepository {
 
         let rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(FetchOneError::Unknown)
+            _ => return Err(FetchOneError::Unknown),
         };
 
         match rooms.iter().find(|room| room.name == name) {
             Some(room) => Ok(room.clone()),
-            _ => Err(FetchOneError::NotFound)
+            _ => Err(FetchOneError::NotFound),
         }
-
     }
 
-    fn add_device(&self, room: RoomName, name: DeviceName) -> Result<DeviceInfo, InsertError> {
-        Err(InsertError::Unknown)
+    fn add_device(
+        &self,
+        room_name: RoomName,
+        device_info: DeviceInfo,
+    ) -> Result<DeviceInfo, InsertError> {
+        if self.returns_error {
+            return Err(InsertError::Unknown);
+        }
+
+        let mut rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(InsertError::Unknown),
+        };
+
+        match rooms.iter_mut().find(|room| room.name == room_name) {
+            Some(room) => {
+                if room
+                    .devices
+                    .iter()
+                    .any(|d| d.name == device_info.name || d.address == device_info.address)
+                {
+                    return Err(InsertError::Conflict);
+                }
+                room.devices.push(device_info.clone());
+                Ok(device_info)
+            }
+            _ => Err(InsertError::Conflict),
+        }
     }
 
     fn fetch_device(&self, name: DeviceName) -> Result<DeviceInfo, FetchOneError> {
         Err(FetchOneError::Unknown)
     }
 }
-
