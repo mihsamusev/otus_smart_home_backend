@@ -52,11 +52,11 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::room::ImMemoryRepository;
+    use crate::repository::room::InMemoryRepository;
     #[test]
     fn add_room_returns_bad_request_error_on_invalid_input() {
         // invalid input is empty room name
-        let repo = Arc::new(ImMemoryRepository::new());
+        let repo = Arc::new(InMemoryRepository::new());
         let request = RoomRequest {
             name: RoomName::empty().into(),
         };
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn add_room_returns_conflict_error_if_room_already_exists() {
-        let repo = Arc::new(ImMemoryRepository::new());
+        let repo = Arc::new(InMemoryRepository::new());
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = RoomRequest {
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn add_room_returns_unknown_error_if_if_repo_errors_unexpectidly() {
-        let repo = Arc::new(ImMemoryRepository::new().with_error());
+        let repo = Arc::new(InMemoryRepository::new().with_error());
         let request = RoomRequest {
             name: RoomName::kitchen().into(),
         };
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn add_room_returns_empty_room_on_success() {
-        let repo = Arc::new(ImMemoryRepository::new());
+        let repo = Arc::new(InMemoryRepository::new());
         let request = RoomRequest {
             name: RoomName::kitchen().into(),
         };
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn fetch_room_returns_not_found_error_if_repo_doesnt_contain_room() {
-        let repo = Arc::new(ImMemoryRepository::new());
+        let repo = Arc::new(InMemoryRepository::new());
         let request = RoomRequest {
             name: RoomName::kitchen().into(),
         };
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn fetch_room_returns_unknown_error_if_repo_errors_unexpectidly() {
-        let repo = Arc::new(ImMemoryRepository::new().with_error());
+        let repo = Arc::new(InMemoryRepository::new().with_error());
         let request = RoomRequest {
             name: RoomName::kitchen().into(),
         };
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn fetch_room_returns_room_on_success() {
-        let repo = Arc::new(ImMemoryRepository::new());
+        let repo = Arc::new(InMemoryRepository::new());
         repo.add_room(RoomName::kitchen()).ok();
         repo.add_room(RoomName::bathroom()).ok();
 

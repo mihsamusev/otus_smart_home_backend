@@ -42,12 +42,12 @@ pub trait Repository: Send + Sync {
     // fn fetch_devices(&self) -> Result<Vec<DeviceInfo>, FetchAllError>;
 }
 
-pub struct ImMemoryRepository {
+pub struct InMemoryRepository {
     returns_error: bool,
     rooms: Mutex<Vec<RoomInfo>>,
 }
 
-impl ImMemoryRepository {
+impl InMemoryRepository {
     pub fn new() -> Self {
         Self {
             returns_error: false,
@@ -64,7 +64,7 @@ impl ImMemoryRepository {
     }
 }
 
-impl Repository for ImMemoryRepository {
+impl Repository for InMemoryRepository {
     fn add_room(&self, name: RoomName) -> Result<RoomInfo, InsertError> {
         if self.returns_error {
             return Err(InsertError::Unknown);
@@ -135,6 +135,25 @@ impl Repository for ImMemoryRepository {
     }
 
     fn fetch_device(&self, name: DeviceName) -> Result<DeviceInfo, FetchOneError> {
-        Err(FetchOneError::Unknown)
+        if self.returns_error {
+            return Err(FetchOneError::Unknown);
+        }
+
+        let rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(FetchOneError::Unknown),
+        };
+
+        for room in rooms.iter() {
+            match room.devices.iter().find(|d| d.name == name) {
+                Some(device) => {
+                    return Ok(device.clone());
+                }
+                _ => {
+                    return Err(FetchOneError::NotFound);
+                }
+            };
+        }
+        Err(FetchOneError::NotFound)
     }
 }
