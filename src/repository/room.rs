@@ -20,7 +20,7 @@ pub enum DeleteError {
     Unknown,
 }
 
-pub trait Repository: Send + Sync {
+pub trait Repository: Send + Sync + 'static {
     fn add_room(&self, name: RoomName) -> Result<RoomInfo, InsertError>;
 
     // fn delete_room(&mut self) -> Result<(), DeleteError>;

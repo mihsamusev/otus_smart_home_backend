@@ -9,14 +9,15 @@ pub enum Error {
     NotFound,
 }
 
+#[derive(Debug)]
 pub struct RoomRequest {
     pub name: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct RoomResponse {
-    name: String,
-    devices: Vec<DeviceResponse>,
+    pub name: String,
+    pub devices: Vec<DeviceResponse>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
