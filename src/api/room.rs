@@ -32,11 +32,12 @@ pub async fn add_room<R: Repository>(
 ) -> HttpResponse {
     let service_req = room::RoomRequest::from(req.into_inner().into());
 
-    // HttpResponse::Ok().body(format!("{:?}", service_req))
     match room::add_room(repo.into_inner(), service_req) {
-        Ok(res) => HttpResponse::Ok().json(web::Json::<AddRoomResponse>(res.into())),
-        Err(room::Error::BadRequest) => HttpResponse::BadRequest().finish(),
-        Err(room::Error::Conflict) => HttpResponse::Conflict().finish(),
+        Ok(res) => HttpResponse::Ok().json(web::Json(AddRoomResponse::from(res))),
+        Err(room::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong room format"),
+        Err(room::Error::Conflict) => {
+            HttpResponse::Conflict().body("room with this name already exists")
+        }
         _ => HttpResponse::InternalServerError().finish(),
     }
 }
