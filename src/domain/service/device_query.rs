@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use crate::domain::entity::{DeviceInfo, DeviceType, DeviceName};
+use crate::domain::client;
 
 use crate::repository::room::{FetchOneError, Repository};
 #[derive(Deserialize)]
@@ -29,7 +30,7 @@ pub fn get_status<R: Repository>(request: StatusRequest, repo: Arc<R>) -> Result
 
     match repo.fetch_device(device_name) {
         Ok(device_info) => {
-            let message = get_status_from_provider(device_info.address, device_info.device_type);
+            let message = get_device_status_message(device_info.address, device_info.device_type);
             Ok(StatusResponse {room_id: request.room_id, device_id: request.device_id, message})
         },
         Err(FetchOneError::Unknown) => Err(StatusError::Unknown),
@@ -38,6 +39,11 @@ pub fn get_status<R: Repository>(request: StatusRequest, repo: Arc<R>) -> Result
     // try use the Device info to on a device info provider
 }
 
-fn get_status_from_provider(address: SocketAddr, device_type: DeviceType) -> String {
-    "ok".to_string()
+fn get_device_status_message(address: SocketAddr, device_type: DeviceType) -> String {
+    let result = match device_type {
+        DeviceType::TcpSocket => client::get_socket_status(address),
+        DeviceType::UdpThermo => client::get_thermo_status(address)
+    };
+    result.unwrap_or_else(|e| e.to_string())
+    
 }

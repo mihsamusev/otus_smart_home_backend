@@ -59,6 +59,10 @@ DeviceTable
 
 Maybe HTTP API shouldnt know anything about types, it just infrastructure directing strings into 
 
+
+Assumptions -> devices can be in the smart house but not physically available
+devices can be in both smart house and physically availlable but uable to connect -> give same error -> connection error
+
 ```rust
 DeviceQuery {
     device_type: DeviceType,
