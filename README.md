@@ -38,9 +38,13 @@ GET /status/{room_id}/{device_id}
 ```
 
 ```
-curl -X POST "127.0.0.1:8888/room" -H 'Content-Type: application/json' -d '{"name": "kitchen"}' -v
-curl -X GET "127.0.0.1:8888/room/kitchen"  -v
-curl -X POST "127.0.0.1:8888/room/kitchen/device" -H 'Content-Type: application/json' -d '{"name": "socket", "address": "127.0.0.1:9999", "device_type": "tcp_socket"}' -v
+curl -X POST "127.0.0.1:8888/room/kitchen" -v
+curl -X POST "127.0.0.1:8888/room/bathroom" -v
+curl -X POST "127.0.0.1:8888/room/kitchen/device" -H 'Content-Type: application/json' -d '{"name": "socket_1", "address": "127.0.0.1:8080", "device_type": "tcp_socket"}' -v
+curl -X POST "127.0.0.1:8888/room/kitchen/device" -H 'Content-Type: application/json' -d '{"name": "socket_2", "address": "127.0.0.1:8090", "device_type": "tcp_socket"}' -v
+curl -X POST "127.0.0.1:8888/room/kitchen" -v
+curl -X GET "127.0.0.1:8888/status/kitchen/socket_1 -v
+curl -X GET "127.0.0.1:8888/status/kitchen/socket_2 -v
 ```
 
 ##
