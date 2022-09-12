@@ -5,13 +5,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct AddRequest {
-    room: String,
-    name: String,
-    address: String,
-    device_type: String,
+    pub room: String,
+    pub name: String,
+    pub address: String,
+    pub device_type: String,
 }
 pub struct FetchRequest {
-    name: String,
+    pub name: String,
 }
 pub struct Response {
     pub room: String,

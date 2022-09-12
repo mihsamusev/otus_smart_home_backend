@@ -5,7 +5,10 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use env_logger::Env;
 use std::net::TcpListener;
 use std::sync::Arc;
+
 pub mod room;
+pub mod device;
+pub mod device_query;
 
 async fn healthcheck() -> HttpResponse {
     HttpResponse::Ok().finish()
@@ -21,8 +24,11 @@ pub fn spawn<R: Repository>(listener: TcpListener, repo: Arc<R>) -> Result<Serve
         App::new()
             .wrap(Logger::default())
             .app_data(app_data.clone())
-            .route("/healthcheck", web::get().to(healthcheck))
-            .route("/room", web::post().to(room::add_room::<R>))
+            .route("/", web::get().to(healthcheck))
+            .route("/room/{room_id}", web::post().to(room::add_room::<R>))
+            .route("/room/{room_id}", web::get().to(room::fetch_room::<R>))
+            .route("/room/{room_id}/device", web::post().to(device::add_device::<R>))
+            .route("/status/{room_id}/{device_id}", web::get().to(device_query::get_status::<R>))
     })
     .listen(listener)?
     .run();

@@ -1,4 +1,4 @@
-use crate::domain::entity::RoomName;
+use crate::domain::entity::{self, RoomName, DeviceInfo};
 use crate::repository::room::{FetchOneError, InsertError, Repository};
 use std::sync::Arc;
 
@@ -22,9 +22,21 @@ pub struct RoomResponse {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DeviceResponse {
-    name: String,
-    device_type: String,
+    pub name: String,
+    pub address: String,
+    pub device_type: String,
 }
+
+impl From<entity::DeviceInfo> for DeviceResponse {
+    fn from(inner: entity::DeviceInfo) -> Self {
+        Self {
+            name: String::from(inner.name),
+            address: inner.address.to_string(),
+            device_type: String::from(inner.device_type)
+        }
+    }
+}
+
 
 pub fn add_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomResponse, Error> {
     let room_name = RoomName::try_from(req.name).map_err(|_| Error::BadRequest)?;
@@ -43,7 +55,7 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
     match repo.fetch_room(room_name) {
         Ok(room_info) => Ok(RoomResponse {
             name: String::from(room_info.name),
-            devices: Vec::new(),
+            devices: room_info.devices.into_iter().map(|info| DeviceResponse::from(info)).collect(),
         }),
         Err(FetchOneError::NotFound) => Err(Error::NotFound),
         Err(FetchOneError::Unknown) => Err(Error::Unknown),
