@@ -33,8 +33,8 @@ pub fn get_status<R: Repository>(
         DeviceName::try_from(request.device_id.clone()).map_err(|_| StatusError::BadRequest)?;
 
     match repo.fetch_device(device_name) {
-        Ok(device_info) => {
-            let message = get_device_status_message(device_info.address, device_info.device_type);
+        Ok(DeviceInfo {name: _name, address, device_type}) => {
+            let message = get_device_status_message(address, device_type);
             Ok(StatusResponse {
                 room_id: request.room_id,
                 device_id: request.device_id,

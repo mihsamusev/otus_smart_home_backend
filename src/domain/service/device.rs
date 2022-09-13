@@ -157,7 +157,7 @@ mod tests {
             device_type: DeviceType::TcpSocket.into(),
         };
 
-        match add_device(repo.clone(), request) {
+        match add_device(repo, request) {
             Err(AddDeviceError::Conflict) => {}
             _ => unreachable!(),
         }
@@ -230,7 +230,7 @@ mod tests {
             device_type: DeviceType::TcpSocket.into(),
         };
 
-        match add_device(repo.clone(), request) {
+        match add_device(repo, request) {
             Err(AddDeviceError::Unknown) => {}
             _ => unreachable!(),
         }

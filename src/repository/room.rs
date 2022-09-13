@@ -47,6 +47,12 @@ pub struct InMemoryRepository {
     rooms: Mutex<Vec<RoomInfo>>,
 }
 
+impl Default for InMemoryRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InMemoryRepository {
     pub fn new() -> Self {
         Self {
@@ -80,7 +86,7 @@ impl Repository for InMemoryRepository {
         }
 
         let new_room = RoomInfo {
-            name: name,
+            name,
             devices: Vec::new(),
         };
         rooms.push(new_room.clone());

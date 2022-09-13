@@ -1,4 +1,4 @@
-use crate::domain::entity::{self, RoomName, DeviceInfo};
+use crate::domain::entity::{self, RoomName};
 use crate::repository::room::{FetchOneError, InsertError, Repository};
 use std::sync::Arc;
 
@@ -55,7 +55,7 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
     match repo.fetch_room(room_name) {
         Ok(room_info) => Ok(RoomResponse {
             name: String::from(room_info.name),
-            devices: room_info.devices.into_iter().map(|info| DeviceResponse::from(info)).collect(),
+            devices: room_info.devices.into_iter().map(DeviceResponse::from).collect(),
         }),
         Err(FetchOneError::NotFound) => Err(Error::NotFound),
         Err(FetchOneError::Unknown) => Err(Error::Unknown),

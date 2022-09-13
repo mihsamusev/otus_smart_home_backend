@@ -6,10 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest = "0.11.11"
-rand = "0.8.5"
 thiserror = "*"
-chrono = "0.4.*"
 clap = {version = "3.2.20", features = ["derive"] }
 env_logger = "0.9"
 serde = { version = "1.0", features = ["derive"] }
@@ -21,3 +18,5 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 [dev-dependencies]
 # test only deps
 float-cmp = "*"
+reqwest = "0.11.11"
+rand = "0.8.5"

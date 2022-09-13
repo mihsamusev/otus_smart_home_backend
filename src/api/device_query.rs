@@ -1,7 +1,6 @@
 use crate::domain::service::device_query;
 use crate::repository::room::Repository;
 use actix_web::{web, HttpResponse};
-use serde::{Deserialize, Serialize};
 
 pub async fn get_status<R: Repository>(
     param: web::Path<(String, String)>,
