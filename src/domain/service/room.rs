@@ -1,5 +1,5 @@
 use crate::domain::entity::{self, RoomName};
-use crate::repository::room::{FetchOneError, InsertError, Repository};
+use crate::repository::room::{FetchError, InsertError, DeleteError, Repository};
 use std::sync::Arc;
 
 pub enum Error {
@@ -27,6 +27,14 @@ pub struct DeviceResponse {
     pub device_type: String,
 }
 
+impl From<entity::RoomInfo> for RoomResponse {
+    fn from(inner: entity::RoomInfo) -> Self {
+        Self {
+            name: String::from(inner.name),
+            devices: inner.devices.into_iter().map(|d| DeviceResponse::from(d)).collect()
+        }
+    }
+} 
 impl From<entity::DeviceInfo> for DeviceResponse {
     fn from(inner: entity::DeviceInfo) -> Self {
         Self {
@@ -57,8 +65,29 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
             name: String::from(room_info.name),
             devices: room_info.devices.into_iter().map(DeviceResponse::from).collect(),
         }),
-        Err(FetchOneError::NotFound) => Err(Error::NotFound),
-        Err(FetchOneError::Unknown) => Err(Error::Unknown),
+        Err(FetchError::NotFound) => Err(Error::NotFound),
+        Err(FetchError::Unknown) => Err(Error::Unknown),
+    }
+}
+
+pub fn fetch_rooms<R: Repository>(repo: Arc<R>) -> Result<Vec<RoomResponse>, Error> {
+    match repo.fetch_rooms() {
+        Ok(room_infos) => Ok(
+            room_infos
+                .into_iter()
+                .map(|i| RoomResponse::from(i)).collect()
+            ),
+        Err(FetchError::NotFound) => Err(Error::NotFound),
+        Err(FetchError::Unknown) => Err(Error::Unknown),
+    }
+}
+
+pub fn delete_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<(), Error> {
+    let room_name = RoomName::try_from(req.name).map_err(|_| Error::BadRequest)?;
+    match repo.delete_room(room_name) {
+        Ok(()) => Ok(()),
+        Err(DeleteError::NotFound) => Err(Error::NotFound),
+        Err(_) => Err(Error::Unknown),
     }
 }
 
@@ -160,5 +189,57 @@ mod tests {
             }
             _ => unreachable!(),
         };
+    }
+
+    #[test]
+    fn fetch_rooms_returns_zero_rooms() {
+        let repo = Arc::new(InMemoryRepository::new());
+
+        match fetch_rooms(repo) {
+            Ok(result) => assert_eq!(result, vec![]),
+            _ => unreachable!(),
+        };  
+    }
+    #[test]
+    fn fetch_rooms_returns_two_rooms() {
+        let repo = Arc::new(InMemoryRepository::new());
+        repo.add_room(RoomName::kitchen()).ok();
+        repo.add_room(RoomName::bathroom()).ok();
+
+        match fetch_rooms(repo) {
+            Ok(result) => assert_eq!(result,
+                vec![
+                    RoomResponse {name: "kitchen".to_string(), devices: vec![]},
+                    RoomResponse {name: "bathroom".to_string(), devices: vec![]}
+                ]),
+            _ => unreachable!(),
+        };
+    }
+
+    #[test]
+    fn delete_room_errors_if_room_doesnt_exist() {
+        let repo = Arc::new(InMemoryRepository::new());
+        let request = RoomRequest {
+            name: RoomName::kitchen().into(),
+        };
+        match delete_room(repo, request) {
+            Err(Error::NotFound) => {},
+            _ => unreachable!(),
+        };  
+    }
+
+    #[test]
+    fn delete_room_deletes_room() {
+        let repo = Arc::new(InMemoryRepository::new());
+        repo.add_room(RoomName::kitchen()).ok();
+        let request = RoomRequest {
+            name: RoomName::kitchen().into(),
+        };
+        delete_room(repo.clone(), request).ok();
+        
+        match fetch_rooms(repo) {
+            Ok(result) => assert_eq!(result, vec![]),
+            _ => unreachable!(),
+        };  
     }
 }

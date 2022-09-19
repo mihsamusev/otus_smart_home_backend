@@ -1,21 +1,23 @@
 use crate::domain::entity::{DeviceInfo, DeviceName, DeviceType, RoomName};
-use crate::repository::room::{FetchOneError, InsertError, Repository};
+use crate::repository::room::{FetchError, InsertError, Repository};
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct AddRequest {
-    pub room: String,
-    pub name: String,
+    pub room_name: String,
+    pub device_name: String,
     pub address: String,
     pub device_type: String,
 }
 pub struct FetchRequest {
-    pub name: String,
+    pub room_name: String,
+    pub device_name: String,
 }
 pub struct Response {
-    pub room: String,
-    pub name: String,
+    pub room_name: String,
+    pub device_name: String,
     pub address: String,
     pub device_type: String,
 }
@@ -36,10 +38,10 @@ pub fn add_device<R: Repository>(
     repo: Arc<R>,
     request: AddRequest,
 ) -> Result<Response, AddDeviceError> {
-    let room_name = RoomName::try_from(request.room).map_err(|_| AddDeviceError::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_name).map_err(|_| AddDeviceError::BadRequest)?;
 
     match (
-        DeviceName::try_from(request.name),
+        DeviceName::try_from(request.device_name),
         SocketAddr::from_str(&request.address),
         DeviceType::try_from(request.device_type),
     ) {
@@ -51,8 +53,8 @@ pub fn add_device<R: Repository>(
             };
             match repo.add_device(room_name.clone(), device_info) {
                 Ok(device_info) => Ok(Response {
-                    room: room_name.into(),
-                    name: device_info.name.into(),
+                    room_name: room_name.into(),
+                    device_name: device_info.name.into(),
                     address: device_info.address.to_string(),
                     device_type: device_info.device_type.into(),
                 }),
@@ -68,26 +70,28 @@ pub fn fetch_device<R: Repository>(
     repo: Arc<R>,
     request: FetchRequest,
 ) -> Result<Response, FetchDeviceError> {
-    let device_name =
-        DeviceName::try_from(request.name).map_err(|_| FetchDeviceError::BadRequest)?;
+    let device_name =DeviceName::try_from(request.device_name)
+        .map_err(|_| FetchDeviceError::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_name.clone())
+        .map_err(|_| FetchDeviceError::BadRequest)?;
 
-    match repo.fetch_device(device_name) {
+    match repo.fetch_device(room_name, device_name) {
         Ok(device_info) => Ok(Response {
-            room: "deez_nutz".into(), // room_name.into(), TODO: WTF, device_info should have room?
-            name: device_info.name.into(),
+            room_name: request.room_name.into(), // room_name.into(), TODO: WTF, device_info should have room_name?
+            device_name: device_info.name.into(),
             address: device_info.address.to_string(),
             device_type: device_info.device_type.into(),
         }),
-        Err(FetchOneError::Unknown) => Err(FetchDeviceError::Unknown),
-        Err(FetchOneError::NotFound) => Err(FetchDeviceError::NotFound),
+        Err(FetchError::Unknown) => Err(FetchDeviceError::Unknown),
+        Err(FetchError::NotFound) => Err(FetchDeviceError::NotFound),
     }
 }
 
 impl AddRequest {
-    pub fn new(room: &str, name: &str, address: &str, device_type: &str) -> Self {
+    pub fn new(room_name: &str, device_name: &str, address: &str, device_type: &str) -> Self {
         Self {
-            room: room.into(),
-            name: name.into(),
+            room_name: room_name.into(),
+            device_name: device_name.into(),
             address: address.into(),
             device_type: device_type.into(),
         }
@@ -106,8 +110,8 @@ mod tests {
 
         // empty device name
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::empty().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::empty().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -119,8 +123,8 @@ mod tests {
 
         // incorrect ip adress
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -132,8 +136,8 @@ mod tests {
 
         // incorrect device type
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: "dumb_socket".to_string(),
         };
@@ -151,8 +155,8 @@ mod tests {
 
         // empty device name
         let request = AddRequest {
-            room: RoomName::bathroom().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::bathroom().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -165,22 +169,22 @@ mod tests {
 
     #[test]
     fn add_device_returns_conflict_if_device_already_exists() {
-        // in the same room or in general?
+        // in the same room_name or in general?
 
         let repo = Arc::new(InMemoryRepository::new());
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
         add_device(repo.clone(), request).ok();
 
         let request_again = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:9999".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -192,22 +196,22 @@ mod tests {
 
     #[test]
     fn add_device_returns_conflict_if_new_device_is_on_the_same_address() {
-        // in the same room or in general?
+        // in the same room_name or in general?
 
         let repo = Arc::new(InMemoryRepository::new());
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
         add_device(repo.clone(), request).ok();
 
         let request_again = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::thermo().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::thermo().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -224,8 +228,8 @@ mod tests {
 
         // empty device name
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
@@ -242,15 +246,15 @@ mod tests {
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
 
         match add_device(repo, request) {
             Ok(result) => {
-                assert_eq!(result.name, String::from(DeviceName::socket()));
+                assert_eq!(result.device_name, String::from(DeviceName::socket()));
                 assert_eq!(result.address, String::from("127.0.0.1:8888"));
                 assert_eq!(result.device_type, String::from(DeviceType::TcpSocket));
             }
@@ -264,7 +268,8 @@ mod tests {
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = FetchRequest {
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
         };
 
         match fetch_device(repo, request) {
@@ -279,7 +284,8 @@ mod tests {
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = FetchRequest {
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
         };
 
         match fetch_device(repo, request) {
@@ -294,20 +300,21 @@ mod tests {
         repo.add_room(RoomName::kitchen()).ok();
 
         let request = AddRequest {
-            room: RoomName::kitchen().into(),
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
         };
         add_device(repo.clone(), request).ok();
 
         let request = FetchRequest {
-            name: DeviceName::socket().into(),
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
         };
 
         match fetch_device(repo, request) {
             Ok(result) => {
-                assert_eq!(result.name, String::from(DeviceName::socket()));
+                assert_eq!(result.device_name, String::from(DeviceName::socket()));
                 assert_eq!(result.address, String::from("127.0.0.1:8888"));
                 assert_eq!(result.device_type, String::from(DeviceType::TcpSocket));
             }

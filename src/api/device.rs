@@ -6,15 +6,15 @@ use crate::repository::room::Repository;
 
 #[derive(Deserialize)]
 pub struct AddDeviceRequest {
-    pub name: String,
+    pub device_name: String,
     pub address: String,
     pub device_type: String
 }
 
 #[derive(Serialize)]
 pub struct AddDeviceResponse {
-    pub room: String,
-    pub name: String,
+    pub room_name: String,
+    pub device_name: String,
     pub address: String,
     pub device_type: String
 }
@@ -22,8 +22,8 @@ pub struct AddDeviceResponse {
 impl From<device::Response> for AddDeviceResponse {
     fn from(inner: device::Response) -> Self {
         Self {
-            room: inner.room,
-            name: inner.name,
+            room_name: inner.room_name,
+            device_name: inner.device_name,
             address: inner.address,
             device_type: inner.device_type
         }
@@ -37,8 +37,8 @@ pub async fn add_device<R: Repository>(
 ) -> HttpResponse {
     let req = req.into_inner();
     let service_req = device::AddRequest {
-        room: room_id.into_inner(),
-        name: req.name,
+        room_name: room_id.into_inner(),
+        device_name: req.device_name,
         address: req.address,
         device_type: req.device_type
     };

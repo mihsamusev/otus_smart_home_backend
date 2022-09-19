@@ -6,13 +6,9 @@ pub enum InsertError {
     Unknown,
 }
 
-pub enum FetchAllError {
+pub enum FetchError {
     Unknown,
-}
-
-pub enum FetchOneError {
-    NotFound,
-    Unknown,
+    NotFound
 }
 
 pub enum DeleteError {
@@ -23,11 +19,11 @@ pub enum DeleteError {
 pub trait Repository: Send + Sync + 'static {
     fn add_room(&self, name: RoomName) -> Result<RoomInfo, InsertError>;
 
-    // fn delete_room(&mut self) -> Result<(), DeleteError>;
+    fn delete_room(&self, name: RoomName) -> Result<(), DeleteError>;
 
-    fn fetch_room(&self, name: RoomName) -> Result<RoomInfo, FetchOneError>;
+    fn fetch_room(&self, name: RoomName) -> Result<RoomInfo, FetchError>;
 
-    // fn fetch_rooms(&self) -> Result<Vec<Room>, FetchAllError>;
+    fn fetch_rooms(&self) -> Result<Vec<RoomInfo>, FetchError>;
 
     fn add_device(
         &self,
@@ -35,11 +31,11 @@ pub trait Repository: Send + Sync + 'static {
         device_info: DeviceInfo,
     ) -> Result<DeviceInfo, InsertError>;
 
-    // fn delete_device(&mut self) -> Result<(), DeleteError>;
+    fn delete_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<(), DeleteError>;
 
-    fn fetch_device(&self, name: DeviceName) -> Result<DeviceInfo, FetchOneError>;
+    fn fetch_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<DeviceInfo, FetchError>;
 
-    // fn fetch_devices(&self) -> Result<Vec<DeviceInfo>, FetchAllError>;
+    fn fetch_devices(&self, room_name: RoomName) -> Result<Vec<DeviceInfo>, FetchError>;
 }
 
 pub struct InMemoryRepository {
@@ -94,20 +90,52 @@ impl Repository for InMemoryRepository {
         Ok(new_room)
     }
 
-    fn fetch_room(&self, name: RoomName) -> Result<RoomInfo, FetchOneError> {
+    fn fetch_room(&self, name: RoomName) -> Result<RoomInfo, FetchError> {
         if self.returns_error {
-            return Err(FetchOneError::Unknown);
+            return Err(FetchError::Unknown);
         }
 
         let rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(FetchOneError::Unknown),
+            _ => return Err(FetchError::Unknown),
         };
 
         match rooms.iter().find(|room| room.name == name) {
             Some(room) => Ok(room.clone()),
-            _ => Err(FetchOneError::NotFound),
+            _ => Err(FetchError::NotFound),
         }
+    }
+
+    fn fetch_rooms(&self) -> Result<Vec<RoomInfo>, FetchError> {
+        if self.returns_error {
+            return Err(FetchError::Unknown);
+        }
+
+        let rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(FetchError::Unknown)
+        };
+
+        Ok(rooms.to_vec())
+    }
+
+    fn delete_room(&self, name: RoomName) -> Result<(), DeleteError> {
+        if self.returns_error {
+            return Err(DeleteError::Unknown);
+        }
+
+        let mut rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(DeleteError::Unknown)
+        };
+        
+        let del_idx = match rooms.iter().position(|r| r.name == name) {
+            Some(idx) => idx,
+            None => return Err(DeleteError::NotFound)
+        };
+
+        rooms.remove(del_idx);
+        Ok(())
     }
 
     fn add_device(
@@ -140,26 +168,64 @@ impl Repository for InMemoryRepository {
         }
     }
 
-    fn fetch_device(&self, name: DeviceName) -> Result<DeviceInfo, FetchOneError> {
+    fn fetch_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<DeviceInfo, FetchError> {
         if self.returns_error {
-            return Err(FetchOneError::Unknown);
+            return Err(FetchError::Unknown);
         }
 
         let rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(FetchOneError::Unknown),
+            _ => return Err(FetchError::Unknown),
         };
 
-        for room in rooms.iter() {
-            match room.devices.iter().find(|d| d.name == name) {
-                Some(device) => {
-                    return Ok(device.clone());
+        match rooms.iter().find(|r| r.name == room_name) {
+            Some(room) => {
+                match room.devices.iter().find(|d| d.name == device_name) {
+                    Some(device) => return Ok(device.clone()),
+                    None => Err(FetchError::NotFound)
                 }
-                _ => {
-                    return Err(FetchOneError::NotFound);
-                }
-            };
+            },
+            None => {Err(FetchError::NotFound)}
         }
-        Err(FetchOneError::NotFound)
+    }
+
+    fn fetch_devices(&self, room_name: RoomName) -> Result<Vec<DeviceInfo>, FetchError> {
+        if self.returns_error {
+            return Err(FetchError::Unknown);
+        }
+
+        let rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(FetchError::Unknown),
+        };
+
+        match rooms.iter().find(|room| room.name == room_name) {
+            Some(room) => Ok(room.devices.to_vec()),
+            _ => Err(FetchError::NotFound),
+        }
+    }
+
+    fn delete_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<(), DeleteError> {
+        if self.returns_error {
+            return Err(DeleteError::Unknown);
+        }
+
+        let mut rooms = match self.rooms.lock() {
+            Ok(rooms) => rooms,
+            _ => return Err(DeleteError::Unknown)
+        };
+        
+        let del_idx = match rooms.iter().find(|r| r.name == room_name) {
+            Some(room) => {
+                match room.devices.iter().position(|d| d.name == device_name) {
+                    Some(idx) => idx,
+                    None => return Err(DeleteError::NotFound)
+                }
+            },
+            None => { return Err(DeleteError::NotFound)}
+        };
+
+        rooms.remove(del_idx);
+        Ok(())
     }
 }

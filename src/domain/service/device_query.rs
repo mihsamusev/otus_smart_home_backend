@@ -1,10 +1,10 @@
 use crate::domain::client;
-use crate::domain::entity::{DeviceInfo, DeviceName, DeviceType};
+use crate::domain::entity::{DeviceInfo, DeviceName, DeviceType, RoomName};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::repository::room::{FetchOneError, Repository};
+use crate::repository::room::{FetchError, Repository};
 #[derive(Deserialize, Debug)]
 pub struct StatusRequest {
     pub room_id: String,
@@ -29,10 +29,13 @@ pub fn get_status<R: Repository>(
     repo: Arc<R>,
 ) -> Result<StatusResponse, StatusError> {
     // try pull the DeviceInfo from the repository
-    let device_name =
-        DeviceName::try_from(request.device_id.clone()).map_err(|_| StatusError::BadRequest)?;
+    let device_name =DeviceName::try_from(request.device_id.clone())
+        .map_err(|_| StatusError::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_id.clone())
+        .map_err(|_| StatusError::BadRequest)?;
+    
 
-    match repo.fetch_device(device_name) {
+    match repo.fetch_device(room_name, device_name) {
         Ok(DeviceInfo {name: _name, address, device_type}) => {
             let message = get_device_status_message(address, device_type);
             Ok(StatusResponse {
@@ -41,8 +44,8 @@ pub fn get_status<R: Repository>(
                 message,
             })
         }
-        Err(FetchOneError::Unknown) => Err(StatusError::Unknown),
-        Err(FetchOneError::NotFound) => Err(StatusError::NotFound),
+        Err(FetchError::Unknown) => Err(StatusError::Unknown),
+        Err(FetchError::NotFound) => Err(StatusError::NotFound),
     }
     // try use the Device info to on a device info provider
 }

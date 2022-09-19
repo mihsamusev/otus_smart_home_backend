@@ -27,7 +27,7 @@ pub fn spawn<R: Repository>(listener: TcpListener, repo: Arc<R>) -> Result<Serve
             .route("/", web::get().to(healthcheck))
             .route("/room/{room_id}", web::post().to(room::add_room::<R>))
             .route("/room/{room_id}", web::get().to(room::fetch_room::<R>))
-            .route("/room/{room_id}/device", web::post().to(device::add_device::<R>))
+            .route("/device/{room_id}", web::post().to(device::add_device::<R>))
             .route("/status/{room_id}/{device_id}", web::get().to(device_query::get_status::<R>))
     })
     .listen(listener)?
