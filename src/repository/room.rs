@@ -243,15 +243,13 @@ impl Repository for InMemoryRepository {
             _ => return Err(DeleteError::Unknown),
         };
 
-        let del_idx = match rooms.iter().find(|r| r.name == room_name) {
+        match rooms.iter_mut().find(|r| r.name == room_name) {
             Some(room) => match room.devices.iter().position(|d| d.name == device_name) {
-                Some(idx) => idx,
+                Some(idx) => room.devices.remove(idx),
                 None => return Err(DeleteError::NotFound),
             },
             None => return Err(DeleteError::NotFound),
         };
-
-        rooms.remove(del_idx);
         Ok(())
     }
 }

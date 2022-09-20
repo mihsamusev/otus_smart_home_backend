@@ -6,7 +6,7 @@ use crate::domain::service::room;
 use crate::repository::room::Repository;
 
 #[derive(Deserialize)]
-pub struct AddRoomRequest {
+pub struct RoomRequest {
     pub name: String,
 }
 
@@ -15,15 +15,10 @@ pub struct AddRoomResponse {
     pub name: String,
 }
 
-#[derive(Deserialize)]
-pub struct FetchRoomRequest {
-    pub name: String,
-}
-
 #[derive(Serialize)]
 pub struct FetchRoomResponse {
     pub name: String,
-    pub devices: Vec<RoomDeviceResponse>
+    pub devices: Vec<RoomDeviceResponse>,
 }
 
 #[derive(Serialize)]
@@ -33,9 +28,9 @@ pub struct RoomDeviceResponse {
     device_type: String,
 }
 
-impl Into<room::RoomRequest> for AddRoomRequest {
-    fn into(self) -> room::RoomRequest {
-        room::RoomRequest { name: self.name }
+impl From<RoomRequest> for room::RoomRequest {
+    fn from(inner: RoomRequest) -> Self {
+        Self { name: inner.name }
     }
 }
 
@@ -45,19 +40,19 @@ impl From<room::RoomResponse> for AddRoomResponse {
     }
 }
 
-impl Into<room::RoomRequest> for FetchRoomRequest {
-    fn into(self) -> room::RoomRequest {
-        room::RoomRequest { name: self.name }
-    }
-}
-
 impl From<room::RoomResponse> for FetchRoomResponse {
     fn from(inner: room::RoomResponse) -> Self {
         Self {
             name: inner.name,
-            devices: inner.devices
+            devices: inner
+                .devices
                 .into_iter()
-                .map(|res| RoomDeviceResponse {name: res.name, address: res.address, device_type: res.device_type}).collect()
+                .map(|res| RoomDeviceResponse {
+                    name: res.name,
+                    address: res.address,
+                    device_type: res.device_type,
+                })
+                .collect(),
         }
     }
 }
@@ -67,8 +62,12 @@ pub async fn add_room<R: Repository>(
     repo: web::Data<R>,
 ) -> HttpResponse {
     let service_req = match entity::RoomName::try_from(room_id.into_inner()) {
-        Ok(name) => room::RoomRequest {name: String::from(name)},
-        Err(_) => {return HttpResponse::BadRequest().body("wrong format for room name");}
+        Ok(name) => room::RoomRequest {
+            name: String::from(name),
+        },
+        Err(_) => {
+            return HttpResponse::BadRequest().body("wrong format for room name");
+        }
     };
 
     match room::add_room(repo.into_inner(), service_req) {
@@ -86,16 +85,50 @@ pub async fn fetch_room<R: Repository>(
     repo: web::Data<R>,
 ) -> HttpResponse {
     let service_req = match entity::RoomName::try_from(room_id.into_inner()) {
-        Ok(name) => room::RoomRequest {name: String::from(name)},
-        Err(_) => {return HttpResponse::BadRequest().body("wrong format for room name");}
+        Ok(name) => room::RoomRequest {
+            name: String::from(name),
+        },
+        Err(_) => {
+            return HttpResponse::BadRequest().body("wrong format for room name");
+        }
     };
 
     match room::fetch_room(repo.into_inner(), service_req) {
         Ok(res) => HttpResponse::Ok().json(web::Json(FetchRoomResponse::from(res))),
         Err(room::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong room format"),
-        Err(room::Error::NotFound) => {
-            HttpResponse::NotFound().body("room not found")
+        Err(room::Error::NotFound) => HttpResponse::NotFound().body("room not found"),
+        _ => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+pub async fn fetch_rooms<R: Repository>(repo: web::Data<R>) -> HttpResponse {
+    match room::fetch_rooms(repo.into_inner()) {
+        Ok(res) => HttpResponse::Ok().json(web::Json::<Vec<FetchRoomResponse>>(
+            res.into_iter().map(FetchRoomResponse::from).collect(),
+        )),
+        Err(room::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong room format"),
+        Err(room::Error::NotFound) => HttpResponse::NotFound().body("room not found"),
+        _ => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+pub async fn delete_room<R: Repository>(
+    room_id: web::Path<String>,
+    repo: web::Data<R>,
+) -> HttpResponse {
+    let service_req = match entity::RoomName::try_from(room_id.into_inner()) {
+        Ok(name) => room::RoomRequest {
+            name: String::from(name),
+        },
+        Err(_) => {
+            return HttpResponse::BadRequest().body("wrong format for room name");
         }
+    };
+
+    match room::delete_room(repo.into_inner(), service_req) {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(room::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong room format"),
+        Err(room::Error::NotFound) => HttpResponse::NotFound().body("room not found"),
         _ => HttpResponse::InternalServerError().finish(),
     }
 }

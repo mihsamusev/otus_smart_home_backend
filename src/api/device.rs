@@ -52,3 +52,42 @@ pub async fn add_device<R: Repository>(
         _ => HttpResponse::InternalServerError().finish(),
     }
 }
+
+pub async fn fetch_device<R: Repository>(
+    param: web::Path<(String, String)>,
+    repo: web::Data<R>,
+) -> HttpResponse {
+    let (room_name, device_name) = param.into_inner();
+    let service_req = device::FetchRequest {
+        room_name,
+        device_name,
+    };
+
+    match device::fetch_device(repo.into_inner(), service_req) {
+        Ok(res) => HttpResponse::Ok().json(web::Json(AddDeviceResponse::from(res))),
+        Err(device::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong device format"),
+        Err(device::Error::NotFound) => {
+            HttpResponse::NotFound().body("requested device or room were not found")
+        }
+        _ => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+pub async fn delete_device<R: Repository>(
+    param: web::Path<(String, String)>,
+    repo: web::Data<R>,
+) -> HttpResponse {
+    let (room_name, device_name) = param.into_inner();
+    let service_req = device::FetchRequest {
+        room_name,
+        device_name,
+    };
+    match device::delete_device(repo.into_inner(), service_req) {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(device::Error::BadRequest) => HttpResponse::BadRequest().body("Wrong device format"),
+        Err(device::Error::NotFound) => {
+            HttpResponse::NotFound().body("requested device or room were not found")
+        }
+        _ => HttpResponse::InternalServerError().finish(),
+    }
+}

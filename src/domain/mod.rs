@@ -1,3 +1,3 @@
-pub mod service;
-pub mod entity;
 pub mod client;
+pub mod entity;
+pub mod service;

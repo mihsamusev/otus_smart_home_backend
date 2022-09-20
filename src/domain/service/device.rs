@@ -64,7 +64,7 @@ pub fn fetch_device<R: Repository>(repo: Arc<R>, request: FetchRequest) -> Resul
 
     match repo.fetch_device(room_name, device_name) {
         Ok(device_info) => Ok(Response {
-            room_name: request.room_name.into(), // room_name.into(), TODO: WTF, device_info should have room_name?
+            room_name: request.room_name,
             device_name: device_info.name.into(),
             address: device_info.address.to_string(),
             device_type: device_info.device_type.into(),
@@ -76,7 +76,7 @@ pub fn fetch_device<R: Repository>(repo: Arc<R>, request: FetchRequest) -> Resul
 
 pub fn delete_device<R: Repository>(repo: Arc<R>, request: FetchRequest) -> Result<(), Error> {
     let device_name = DeviceName::try_from(request.device_name).map_err(|_| Error::BadRequest)?;
-    let room_name = RoomName::try_from(request.room_name.clone()).map_err(|_| Error::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_name).map_err(|_| Error::BadRequest)?;
 
     match repo.delete_device(room_name, device_name) {
         Ok(_) => Ok(()),

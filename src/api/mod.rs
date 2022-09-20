@@ -6,9 +6,9 @@ use env_logger::Env;
 use std::net::TcpListener;
 use std::sync::Arc;
 
-pub mod room;
 pub mod device;
 pub mod device_query;
+pub mod room;
 
 async fn healthcheck() -> HttpResponse {
     HttpResponse::Ok().finish()
@@ -16,8 +16,6 @@ async fn healthcheck() -> HttpResponse {
 
 pub fn spawn<R: Repository>(listener: TcpListener, repo: Arc<R>) -> Result<Server, std::io::Error> {
     let app_data = web::Data::from(repo);
-
-    std::env::set_var("RUST_LOG", "actix_web=trace");
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let server = HttpServer::new(move || {
@@ -27,8 +25,25 @@ pub fn spawn<R: Repository>(listener: TcpListener, repo: Arc<R>) -> Result<Serve
             .route("/", web::get().to(healthcheck))
             .route("/room/{room_id}", web::post().to(room::add_room::<R>))
             .route("/room/{room_id}", web::get().to(room::fetch_room::<R>))
+            .route("/room/{room_id}", web::delete().to(room::delete_room::<R>))
+            .route("/room", web::get().to(room::fetch_rooms::<R>))
             .route("/device/{room_id}", web::post().to(device::add_device::<R>))
-            .route("/status/{room_id}/{device_id}", web::get().to(device_query::get_status::<R>))
+            .route(
+                "/device/{room_id}/{device_id}",
+                web::get().to(device::fetch_device::<R>),
+            )
+            .route(
+                "/device/{room_id}/{device_id}",
+                web::delete().to(device::delete_device::<R>),
+            )
+            .route(
+                "/status/{room_id}/{device_id}",
+                web::get().to(device_query::get_device_status::<R>),
+            )
+            .route(
+                "/status/{room_id}",
+                web::get().to(device_query::get_room_status::<R>),
+            )
     })
     .listen(listener)?
     .run();

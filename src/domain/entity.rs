@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 #[derive(Clone)]
 pub struct RoomInfo {
     pub name: RoomName,
-    pub devices: Vec<DeviceInfo>
+    pub devices: Vec<DeviceInfo>,
 }
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -30,7 +30,7 @@ impl From<RoomName> for String {
 #[derive(Clone)]
 pub enum DeviceType {
     TcpSocket,
-    UdpThermo
+    UdpThermo,
 }
 
 impl TryFrom<String> for DeviceType {
@@ -57,8 +57,8 @@ impl From<DeviceType> for String {
 #[derive(Clone)]
 pub struct DeviceInfo {
     pub name: DeviceName,
-    pub address: SocketAddr, 
-    pub device_type: DeviceType
+    pub address: SocketAddr,
+    pub device_type: DeviceType,
 }
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]

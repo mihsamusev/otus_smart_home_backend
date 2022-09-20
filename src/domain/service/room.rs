@@ -1,5 +1,5 @@
 use crate::domain::entity::{self, RoomName};
-use crate::repository::room::{FetchError, InsertError, DeleteError, Repository};
+use crate::repository::room::{DeleteError, FetchError, InsertError, Repository};
 use std::sync::Arc;
 
 pub enum Error {
@@ -31,20 +31,23 @@ impl From<entity::RoomInfo> for RoomResponse {
     fn from(inner: entity::RoomInfo) -> Self {
         Self {
             name: String::from(inner.name),
-            devices: inner.devices.into_iter().map(|d| DeviceResponse::from(d)).collect()
+            devices: inner
+                .devices
+                .into_iter()
+                .map(DeviceResponse::from)
+                .collect(),
         }
     }
-} 
+}
 impl From<entity::DeviceInfo> for DeviceResponse {
     fn from(inner: entity::DeviceInfo) -> Self {
         Self {
             name: String::from(inner.name),
             address: inner.address.to_string(),
-            device_type: String::from(inner.device_type)
+            device_type: String::from(inner.device_type),
         }
     }
 }
-
 
 pub fn add_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomResponse, Error> {
     let room_name = RoomName::try_from(req.name).map_err(|_| Error::BadRequest)?;
@@ -63,7 +66,11 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
     match repo.fetch_room(room_name) {
         Ok(room_info) => Ok(RoomResponse {
             name: String::from(room_info.name),
-            devices: room_info.devices.into_iter().map(DeviceResponse::from).collect(),
+            devices: room_info
+                .devices
+                .into_iter()
+                .map(DeviceResponse::from)
+                .collect(),
         }),
         Err(FetchError::NotFound) => Err(Error::NotFound),
         Err(FetchError::Unknown) => Err(Error::Unknown),
@@ -72,11 +79,7 @@ pub fn fetch_room<R: Repository>(repo: Arc<R>, req: RoomRequest) -> Result<RoomR
 
 pub fn fetch_rooms<R: Repository>(repo: Arc<R>) -> Result<Vec<RoomResponse>, Error> {
     match repo.fetch_rooms() {
-        Ok(room_infos) => Ok(
-            room_infos
-                .into_iter()
-                .map(|i| RoomResponse::from(i)).collect()
-            ),
+        Ok(room_infos) => Ok(room_infos.into_iter().map(RoomResponse::from).collect()),
         Err(FetchError::NotFound) => Err(Error::NotFound),
         Err(FetchError::Unknown) => Err(Error::Unknown),
     }
@@ -198,7 +201,7 @@ mod tests {
         match fetch_rooms(repo) {
             Ok(result) => assert_eq!(result, vec![]),
             _ => unreachable!(),
-        };  
+        };
     }
     #[test]
     fn fetch_rooms_returns_two_rooms() {
@@ -207,11 +210,19 @@ mod tests {
         repo.add_room(RoomName::bathroom()).ok();
 
         match fetch_rooms(repo) {
-            Ok(result) => assert_eq!(result,
+            Ok(result) => assert_eq!(
+                result,
                 vec![
-                    RoomResponse {name: "kitchen".to_string(), devices: vec![]},
-                    RoomResponse {name: "bathroom".to_string(), devices: vec![]}
-                ]),
+                    RoomResponse {
+                        name: "kitchen".to_string(),
+                        devices: vec![]
+                    },
+                    RoomResponse {
+                        name: "bathroom".to_string(),
+                        devices: vec![]
+                    }
+                ]
+            ),
             _ => unreachable!(),
         };
     }
@@ -223,9 +234,9 @@ mod tests {
             name: RoomName::kitchen().into(),
         };
         match delete_room(repo, request) {
-            Err(Error::NotFound) => {},
+            Err(Error::NotFound) => {}
             _ => unreachable!(),
-        };  
+        };
     }
 
     #[test]
@@ -236,10 +247,10 @@ mod tests {
             name: RoomName::kitchen().into(),
         };
         delete_room(repo.clone(), request).ok();
-        
+
         match fetch_rooms(repo) {
             Ok(result) => assert_eq!(result, vec![]),
             _ => unreachable!(),
-        };  
+        };
     }
 }
