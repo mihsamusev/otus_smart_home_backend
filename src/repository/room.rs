@@ -8,7 +8,7 @@ pub enum InsertError {
 
 pub enum FetchError {
     Unknown,
-    NotFound
+    NotFound,
 }
 
 pub enum DeleteError {
@@ -31,9 +31,17 @@ pub trait Repository: Send + Sync + 'static {
         device_info: DeviceInfo,
     ) -> Result<DeviceInfo, InsertError>;
 
-    fn delete_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<(), DeleteError>;
+    fn delete_device(
+        &self,
+        room_name: RoomName,
+        device_name: DeviceName,
+    ) -> Result<(), DeleteError>;
 
-    fn fetch_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<DeviceInfo, FetchError>;
+    fn fetch_device(
+        &self,
+        room_name: RoomName,
+        device_name: DeviceName,
+    ) -> Result<DeviceInfo, FetchError>;
 
     fn fetch_devices(&self, room_name: RoomName) -> Result<Vec<DeviceInfo>, FetchError>;
 }
@@ -113,7 +121,7 @@ impl Repository for InMemoryRepository {
 
         let rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(FetchError::Unknown)
+            _ => return Err(FetchError::Unknown),
         };
 
         Ok(rooms.to_vec())
@@ -126,12 +134,12 @@ impl Repository for InMemoryRepository {
 
         let mut rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(DeleteError::Unknown)
+            _ => return Err(DeleteError::Unknown),
         };
-        
+
         let del_idx = match rooms.iter().position(|r| r.name == name) {
             Some(idx) => idx,
-            None => return Err(DeleteError::NotFound)
+            None => return Err(DeleteError::NotFound),
         };
 
         rooms.remove(del_idx);
@@ -152,6 +160,20 @@ impl Repository for InMemoryRepository {
             _ => return Err(InsertError::Unknown),
         };
 
+        // check device with the same address cant in the same house
+        let conflict_addresses = rooms
+            .iter()
+            .filter(|room| {
+                room.devices
+                    .iter()
+                    .any(|d| d.address == device_info.address)
+            })
+            .count();
+        if conflict_addresses > 0 {
+            return Err(InsertError::Conflict);
+        }
+
+        // check device with the same name cant be in the same room
         match rooms.iter_mut().find(|room| room.name == room_name) {
             Some(room) => {
                 if room
@@ -168,7 +190,11 @@ impl Repository for InMemoryRepository {
         }
     }
 
-    fn fetch_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<DeviceInfo, FetchError> {
+    fn fetch_device(
+        &self,
+        room_name: RoomName,
+        device_name: DeviceName,
+    ) -> Result<DeviceInfo, FetchError> {
         if self.returns_error {
             return Err(FetchError::Unknown);
         }
@@ -179,13 +205,11 @@ impl Repository for InMemoryRepository {
         };
 
         match rooms.iter().find(|r| r.name == room_name) {
-            Some(room) => {
-                match room.devices.iter().find(|d| d.name == device_name) {
-                    Some(device) => return Ok(device.clone()),
-                    None => Err(FetchError::NotFound)
-                }
+            Some(room) => match room.devices.iter().find(|d| d.name == device_name) {
+                Some(device) => Ok(device.clone()),
+                None => Err(FetchError::NotFound),
             },
-            None => {Err(FetchError::NotFound)}
+            None => Err(FetchError::NotFound),
         }
     }
 
@@ -205,24 +229,26 @@ impl Repository for InMemoryRepository {
         }
     }
 
-    fn delete_device(&self, room_name: RoomName, device_name: DeviceName) -> Result<(), DeleteError> {
+    fn delete_device(
+        &self,
+        room_name: RoomName,
+        device_name: DeviceName,
+    ) -> Result<(), DeleteError> {
         if self.returns_error {
             return Err(DeleteError::Unknown);
         }
 
         let mut rooms = match self.rooms.lock() {
             Ok(rooms) => rooms,
-            _ => return Err(DeleteError::Unknown)
+            _ => return Err(DeleteError::Unknown),
         };
-        
+
         let del_idx = match rooms.iter().find(|r| r.name == room_name) {
-            Some(room) => {
-                match room.devices.iter().position(|d| d.name == device_name) {
-                    Some(idx) => idx,
-                    None => return Err(DeleteError::NotFound)
-                }
+            Some(room) => match room.devices.iter().position(|d| d.name == device_name) {
+                Some(idx) => idx,
+                None => return Err(DeleteError::NotFound),
             },
-            None => { return Err(DeleteError::NotFound)}
+            None => return Err(DeleteError::NotFound),
         };
 
         rooms.remove(del_idx);

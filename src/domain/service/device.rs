@@ -1,5 +1,5 @@
 use crate::domain::entity::{DeviceInfo, DeviceName, DeviceType, RoomName};
-use crate::repository::room::{FetchError, InsertError, Repository};
+use crate::repository::room::{DeleteError, FetchError, InsertError, Repository};
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -22,23 +22,15 @@ pub struct Response {
     pub device_type: String,
 }
 
-pub enum AddDeviceError {
+pub enum Error {
     BadRequest,
     Conflict,
     Unknown,
-}
-
-pub enum FetchDeviceError {
-    BadRequest,
     NotFound,
-    Unknown,
 }
 
-pub fn add_device<R: Repository>(
-    repo: Arc<R>,
-    request: AddRequest,
-) -> Result<Response, AddDeviceError> {
-    let room_name = RoomName::try_from(request.room_name).map_err(|_| AddDeviceError::BadRequest)?;
+pub fn add_device<R: Repository>(repo: Arc<R>, request: AddRequest) -> Result<Response, Error> {
+    let room_name = RoomName::try_from(request.room_name).map_err(|_| Error::BadRequest)?;
 
     match (
         DeviceName::try_from(request.device_name),
@@ -58,22 +50,17 @@ pub fn add_device<R: Repository>(
                     address: device_info.address.to_string(),
                     device_type: device_info.device_type.into(),
                 }),
-                Err(InsertError::Conflict) => Err(AddDeviceError::Conflict),
-                Err(InsertError::Unknown) => Err(AddDeviceError::Unknown),
+                Err(InsertError::Conflict) => Err(Error::Conflict),
+                Err(InsertError::Unknown) => Err(Error::Unknown),
             }
         }
-        _ => Err(AddDeviceError::BadRequest),
+        _ => Err(Error::BadRequest),
     }
 }
 
-pub fn fetch_device<R: Repository>(
-    repo: Arc<R>,
-    request: FetchRequest,
-) -> Result<Response, FetchDeviceError> {
-    let device_name =DeviceName::try_from(request.device_name)
-        .map_err(|_| FetchDeviceError::BadRequest)?;
-    let room_name = RoomName::try_from(request.room_name.clone())
-        .map_err(|_| FetchDeviceError::BadRequest)?;
+pub fn fetch_device<R: Repository>(repo: Arc<R>, request: FetchRequest) -> Result<Response, Error> {
+    let device_name = DeviceName::try_from(request.device_name).map_err(|_| Error::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_name.clone()).map_err(|_| Error::BadRequest)?;
 
     match repo.fetch_device(room_name, device_name) {
         Ok(device_info) => Ok(Response {
@@ -82,8 +69,19 @@ pub fn fetch_device<R: Repository>(
             address: device_info.address.to_string(),
             device_type: device_info.device_type.into(),
         }),
-        Err(FetchError::Unknown) => Err(FetchDeviceError::Unknown),
-        Err(FetchError::NotFound) => Err(FetchDeviceError::NotFound),
+        Err(FetchError::Unknown) => Err(Error::Unknown),
+        Err(FetchError::NotFound) => Err(Error::NotFound),
+    }
+}
+
+pub fn delete_device<R: Repository>(repo: Arc<R>, request: FetchRequest) -> Result<(), Error> {
+    let device_name = DeviceName::try_from(request.device_name).map_err(|_| Error::BadRequest)?;
+    let room_name = RoomName::try_from(request.room_name.clone()).map_err(|_| Error::BadRequest)?;
+
+    match repo.delete_device(room_name, device_name) {
+        Ok(_) => Ok(()),
+        Err(DeleteError::Unknown) => Err(Error::Unknown),
+        Err(DeleteError::NotFound) => Err(Error::NotFound),
     }
 }
 
@@ -117,7 +115,7 @@ mod tests {
         };
 
         match add_device(repo.clone(), request) {
-            Err(AddDeviceError::BadRequest) => {}
+            Err(Error::BadRequest) => {}
             _ => unreachable!(),
         }
 
@@ -130,7 +128,7 @@ mod tests {
         };
 
         match add_device(repo.clone(), request) {
-            Err(AddDeviceError::BadRequest) => {}
+            Err(Error::BadRequest) => {}
             _ => unreachable!(),
         }
 
@@ -143,7 +141,7 @@ mod tests {
         };
 
         match add_device(repo, request) {
-            Err(AddDeviceError::BadRequest) => {}
+            Err(Error::BadRequest) => {}
             _ => unreachable!(),
         }
     }
@@ -162,13 +160,13 @@ mod tests {
         };
 
         match add_device(repo, request) {
-            Err(AddDeviceError::Conflict) => {}
+            Err(Error::Conflict) => {}
             _ => unreachable!(),
         }
     }
 
     #[test]
-    fn add_device_returns_conflict_if_device_already_exists() {
+    fn add_device_returns_conflict_if_device_already_exists_in_the_same_room() {
         // in the same room_name or in general?
 
         let repo = Arc::new(InMemoryRepository::new());
@@ -189,20 +187,21 @@ mod tests {
             device_type: DeviceType::TcpSocket.into(),
         };
         match add_device(repo, request_again) {
-            Err(AddDeviceError::Conflict) => {}
+            Err(Error::Conflict) => {}
             _ => unreachable!(),
         }
     }
 
     #[test]
-    fn add_device_returns_conflict_if_new_device_is_on_the_same_address() {
+    fn add_device_returns_conflict_if_new_device_is_on_the_same_address_across_entire_home() {
         // in the same room_name or in general?
 
         let repo = Arc::new(InMemoryRepository::new());
         repo.add_room(RoomName::kitchen()).ok();
+        repo.add_room(RoomName::bathroom()).ok();
 
         let request = AddRequest {
-            room_name: RoomName::kitchen().into(),
+            room_name: RoomName::bathroom().into(),
             device_name: DeviceName::socket().into(),
             address: "127.0.0.1:8888".to_string(),
             device_type: DeviceType::TcpSocket.into(),
@@ -216,7 +215,7 @@ mod tests {
             device_type: DeviceType::TcpSocket.into(),
         };
         match add_device(repo, request_again) {
-            Err(AddDeviceError::Conflict) => {}
+            Err(Error::Conflict) => {}
             _ => unreachable!(),
         }
     }
@@ -235,7 +234,7 @@ mod tests {
         };
 
         match add_device(repo, request) {
-            Err(AddDeviceError::Unknown) => {}
+            Err(Error::Unknown) => {}
             _ => unreachable!(),
         }
     }
@@ -273,7 +272,7 @@ mod tests {
         };
 
         match fetch_device(repo, request) {
-            Err(FetchDeviceError::Unknown) => {}
+            Err(Error::Unknown) => {}
             _ => unreachable!(),
         }
     }
@@ -289,7 +288,7 @@ mod tests {
         };
 
         match fetch_device(repo, request) {
-            Err(FetchDeviceError::NotFound) => {}
+            Err(Error::NotFound) => {}
             _ => unreachable!(),
         }
     }
@@ -318,6 +317,58 @@ mod tests {
                 assert_eq!(result.address, String::from("127.0.0.1:8888"));
                 assert_eq!(result.device_type, String::from(DeviceType::TcpSocket));
             }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn delete_device_errors_if_device_doesnt_exist() {
+        let repo = Arc::new(InMemoryRepository::new());
+        repo.add_room(RoomName::kitchen()).ok();
+
+        let request = FetchRequest {
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
+        };
+        match delete_device(repo, request) {
+            Err(Error::NotFound) => {}
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn delete_device_errors_if_room_doesnt_exist() {
+        let repo = Arc::new(InMemoryRepository::new());
+
+        let request = FetchRequest {
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
+        };
+        match delete_device(repo, request) {
+            Err(Error::NotFound) => {}
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn delete_device_success() {
+        let repo = Arc::new(InMemoryRepository::new());
+        repo.add_room(RoomName::kitchen()).ok();
+
+        let request = AddRequest {
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
+            address: "127.0.0.1:8888".to_string(),
+            device_type: DeviceType::TcpSocket.into(),
+        };
+        add_device(repo.clone(), request).ok();
+
+        let request = FetchRequest {
+            room_name: RoomName::kitchen().into(),
+            device_name: DeviceName::socket().into(),
+        };
+        match delete_device(repo, request) {
+            Ok(_) => {}
             _ => unreachable!(),
         }
     }

@@ -1,5 +1,4 @@
 use clap::Parser;
-use rand;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
