@@ -1,3 +1,5 @@
+# Smart home backend
+
 Exercise in creating a smart home HTTP backend for [OTUS Rust Developer](https://otus.ru/lessons/rust-developer/?int_source=courses_catalog&int_term=programming)
 
 [![](https://github.com/mihsamusev/otus_smart_home_backend/actions/workflows/build.yml/badge.svg)](https://github.com/mihsamusev/otus_smart_home_backend/actions/workflows/build.yml)
